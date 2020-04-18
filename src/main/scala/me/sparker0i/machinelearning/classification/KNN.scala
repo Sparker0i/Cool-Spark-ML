@@ -1,9 +1,7 @@
 package me.sparker0i.machinelearning.classification
 
 import me.sparker0i.machinelearning._
-
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.ml.feature.StringIndexer
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
 
@@ -17,7 +15,7 @@ object KNN {
         df = readCsv(fileName = "C:\\Users\\Spark\\Downloads\\iris.csv", header = true)
 
         normalizeData()
-        convertClassToNumerical()
+        moveClassToEnd()
 
         df.show()
 
@@ -42,13 +40,9 @@ object KNN {
         }
     }
 
-    def convertClassToNumerical(): Unit = {
-        val indexer = new StringIndexer()
-            .setInputCol("Class")
-            .setOutputCol("Class_Indexed")
-
-        df = indexer.fit(df).transform(df)
-            .drop($"Class")
+    def moveClassToEnd(): Unit = {
+        val cols = df.columns.filterNot(_ == "Class") ++ Array("Class")
+        df = df.select(cols.head, cols.tail: _*)
     }
 
     def readCsv(fileName: String, header: Boolean): DataFrame = {
@@ -61,7 +55,7 @@ object KNN {
     }
 
     def evaluateAlgorithm(data: DataFrame, folds: Array[Dataset[Row]], k: Int,
-            algorithm: (Array[Row], Array[Row], Int) => List[Double]): List[Double] = {
+            algorithm: (Array[Row], Array[Row], Int) => List[String]): List[Double] = {
         val scores = for (i <- folds.indices) yield {
             var ts = folds
             val testSet = ts(i).collect()
@@ -75,14 +69,14 @@ object KNN {
             }
 
             val predicted = algorithm(trainSet.collect(), testSet, k)
-            val actual = (for (row <- testSet) yield row.getDouble(testSet(0).length - 1)).toList
+            val actual = (for (row <- testSet) yield row.getString(testSet(0).length - 1)).toList
 
             accuracyMetric(actual, predicted)
         }
         scores.toList
     }
 
-    def accuracyMetric(actual: List[Double], predicted: List[Double]): Double = {
+    def accuracyMetric(actual: List[String], predicted: List[String]): Double = {
         var correct = 0.0
         for (i <- actual.indices) {
             if (actual(i) == predicted(i))
@@ -99,13 +93,13 @@ object KNN {
         math.sqrt(distance)
     }
 
-    def kNN(trainSet: Array[Row], testSet: Array[Row], k: Int): List[Double] = {
+    def kNN(trainSet: Array[Row], testSet: Array[Row], k: Int): List[String] = {
         (for (row <- testSet) yield predictClassification(trainSet, row, k)).toList
     }
 
-    def predictClassification(trainSet: Array[Row], testRow: Row, k: Int): Double = {
+    def predictClassification(trainSet: Array[Row], testRow: Row, k: Int): String = {
         val neighbours = getNeighbours(trainSet, testRow, k)
-        (for (row <- neighbours) yield row.getDouble(trainSet(0).length - 1))
+        (for (row <- neighbours) yield row.getString(trainSet(0).length - 1))
             .groupBy(identity)
             .mapValues(_.size)
             .toSeq
