@@ -7,15 +7,14 @@ import org.apache.spark.sql.{DataFrame, Dataset, Row}
 
 object KNN {
     import spark.implicits._
-    var df: DataFrame = _
 
     def main(args: Array[String]): Unit = {
         Logger.getLogger("org").setLevel(Level.ERROR)
 
-        df = readCsv(fileName = "C:\\Users\\Spark\\Downloads\\iris.csv", header = true)
+        var df = readCsv(fileName = "C:\\Users\\Spark\\Downloads\\iris.csv", header = true)
 
-        normalizeData()
-        moveClassToEnd()
+        df = df.transform(normalizeData)
+            .transform(moveClassToEnd)
 
         df.show()
 
@@ -23,26 +22,28 @@ object KNN {
         val folds = df.randomSplit(Array.fill(nFolds)(1.0/nFolds))
 
         for (k <- 1 to 10) {
-            val scores = evaluateAlgorithm(df, folds, k, kNN)
+            val scores = evaluateAlgorithm(folds, k, kNN)
             println(s"Scores = $scores")
             println(s"Accuracy at k = $k : ${scores.sum/scores.length} %\n")
         }
     }
 
-    def normalizeData(): Unit = {
+    def normalizeData(df: DataFrame): DataFrame = {
+        var x = df
         df.columns.filterNot(e => e == "Class").foreach{col =>
             val (mean_col, stddev_col) = df.select(mean(col), stddev(col))
                 .as[(Double, Double)]
                 .first()
-            df = df.withColumn(s"$col.norm", ($"$col" - mean_col) / stddev_col)
+            x = x.withColumn(s"$col.norm", ($"$col" - mean_col) / stddev_col)
                 .drop(col)
                 .withColumnRenamed(s"$col.norm", col)
         }
+        x
     }
 
-    def moveClassToEnd(): Unit = {
+    def moveClassToEnd(df: DataFrame): DataFrame = {
         val cols = df.columns.filterNot(_ == "Class") ++ Array("Class")
-        df = df.select(cols.head, cols.tail: _*)
+        df.select(cols.head, cols.tail: _*)
     }
 
     def readCsv(fileName: String, header: Boolean): DataFrame = {
@@ -54,19 +55,12 @@ object KNN {
             .repartition($"Class")
     }
 
-    def evaluateAlgorithm(data: DataFrame, folds: Array[Dataset[Row]], k: Int,
-            algorithm: (Array[Row], Array[Row], Int) => List[String]): List[Double] = {
+    def evaluateAlgorithm(folds: Array[Dataset[Row]], k: Int, algorithm: (Array[Row], Array[Row], Int) => List[String]): List[Double] = {
         val scores = for (i <- folds.indices) yield {
-            var ts = folds
-            val testSet = ts(i).collect()
-            ts = ts.zipWithIndex.filter(_._2 != i)
-                    .map(_._1)
-
-            var trainSet = spark.createDataFrame(spark.sparkContext.emptyRDD[Row], ts(0).schema)
-
-            for (j <- ts.indices) {
-                trainSet = trainSet.union(ts(j))
-            }
+            val trainSet = folds.zipWithIndex.filter(_._2 != i)
+                .map(_._1)
+                .reduce((a, b) => a.union(b))
+            val testSet = folds(i).collect()
 
             val predicted = algorithm(trainSet.collect(), testSet, k)
             val actual = (for (row <- testSet) yield row.getString(testSet(0).length - 1)).toList
