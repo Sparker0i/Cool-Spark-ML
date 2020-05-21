@@ -50,7 +50,6 @@ object KNN {
         spark.read
             .format("csv")
             .option("header", header)
-            .option("inferSchema", header)
             .load(fileName)
             .repartition($"Class")
     }
