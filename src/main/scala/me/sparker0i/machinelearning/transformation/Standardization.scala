@@ -7,16 +7,17 @@ import org.apache.log4j.{Level, Logger}
 
 object Standardization extends App {
     Logger.getLogger("org").setLevel(Level.ERROR)
+    import spark.implicits._
 
-    val featuresDf = spark.createDataFrame{
+    val points = for (i <- 1 to 1000) yield (i, Vectors.dense(
         Array(
-            (1, Vectors.dense(Array(10.0, 10000.0, 1.0))),
-            (2, Vectors.dense(Array(20.0, 30000.0, 2.0))),
-            (3, Vectors.dense(Array(30.0, 40000.0, 3.0)))
+            (math.random() * (10 - 1)) * i + 1.0,
+            (math.random() * (10000 - 1000)) + 1000.0,
+            math.random() * i
         )
-    }
-        .withColumnRenamed("_1", "id")
-        .withColumnRenamed("_2", "features")
+    ))
+
+    val featuresDf = points.toDF("id", "features")
 
     featuresDf.show()
 

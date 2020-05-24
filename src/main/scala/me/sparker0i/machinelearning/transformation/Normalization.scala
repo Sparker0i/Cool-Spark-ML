@@ -7,18 +7,19 @@ import org.apache.spark.ml.linalg.Vectors
 
 object Normalization extends App {
     Logger.getLogger("org").setLevel(Level.ERROR)
+    import spark.implicits._
 
-    val featuresDf = spark.createDataFrame{
+    val points = for (i <- 1 to 1000) yield (i, Vectors.dense(
         Array(
-            (1, Vectors.dense(Array(10.0, 1000.0, 1.0))),
-            (2, Vectors.dense(Array(20.0, 3000.0, 2.0))),
-            (3, Vectors.dense(Array(30.0, 4000.0, 3.0)))
+            (math.random() * (10 - 1)) * i + 1.0,
+            (math.random() * (10000 - 1000)) + 1000.0,
+            math.random() * i
         )
-    }
-        .withColumnRenamed("_1", "id")
-        .withColumnRenamed("_2", "features")
+    ))
 
-    featuresDf.show()
+    val featuresDf = points.toDF("id", "features")
+
+    featuresDf.show(truncate = false)
 
     val featureScaler = new MinMaxScaler()
         .setInputCol("features")
@@ -27,5 +28,5 @@ object Normalization extends App {
     val sModel = featureScaler.fit(featuresDf)
     val sFeaturesDf = sModel.transform(featuresDf)
 
-    sFeaturesDf.show()
+    sFeaturesDf.show(truncate = false)
 }
