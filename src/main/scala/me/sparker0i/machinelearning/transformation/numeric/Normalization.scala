@@ -1,4 +1,4 @@
-package me.sparker0i.machinelearning.transformation
+package me.sparker0i.machinelearning.transformation.numeric
 
 import me.sparker0i.machinelearning.spark
 import org.apache.log4j.{Level, Logger}
@@ -11,9 +11,9 @@ object Normalization extends App {
 
     val points = for (i <- 1 to 1000) yield (i, Vectors.dense(
         Array(
-            (math.random() * (10 - 1)) * i + 1.0,
-            (math.random() * (10000 - 1000)) + 1000.0,
-            math.random() * i
+            (math.random * (10 - 1)) * i + 1.0,
+            (math.random * (10000 - 1000)) + 1000.0,
+            math.random * i
         )
     ))
 
